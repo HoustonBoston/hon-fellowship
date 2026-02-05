@@ -1,3 +1,5 @@
+#!/bin/.venv/python3
+
 # Copyright Roshan Karthik Rajesh 2026
 # Script to scrape data from DFPI website
 
@@ -77,9 +79,9 @@ def scrape_dfpi_data(url):
                 for subject, complaint_narrative, scam, site in zip(primary_subject, complaint_narrative, scam_type, website):
                     data.append(
                         {
+                            "primary_subject" : subject.get_text(strip=True),
                             "complaint_narrative" : complaint_narrative.get_text(strip=True),
                             "scam_type" : scam.get_text(strip=True),
-                            "primary_subject" : subject.get_text(strip=True),
                             "website" : site.get_text(strip=True)
                         }
                     )
@@ -102,4 +104,11 @@ def scrape_dfpi_data(url):
         driver.quit()
 
 if __name__ == '__main__':
-    scrape_dfpi_data(URL)
+    data = scrape_dfpi_data(URL)
+
+    # Write data to CSV 
+    keys = data[0].keys()
+    with open('dfpi_crypto_scam_data.csv', 'w', newline='', encoding='utf-8') as output_file:
+        dict_writer = csv.DictWriter(output_file, fieldnames=keys)
+        dict_writer.writeheader()
+        dict_writer.writerows(data)
