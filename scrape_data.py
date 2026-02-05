@@ -18,7 +18,7 @@ def scrape_dfpi_data(url):
     options = uc.ChromeOptions()
     options.add_argument('--headless=new')
     
-    driver = uc.Chrome(version_main=144, headless=False, use_subprocess=False)
+    driver = uc.Chrome(version_main=144, headless=False, use_subprocess=True)
     
     try:
         driver.get(url)
@@ -38,12 +38,6 @@ def scrape_dfpi_data(url):
                 f.write(soup_debug.prettify())
             print("Timed out waiting for data. Saved page source to page_debug.html for inspection")
             return []
-        
-        # Save page source for debugging
-        with open("page_debug.html", "w") as f:
-            soup_debug = BeautifulSoup(driver.page_source, 'html.parser')
-            f.write(soup_debug.prettify())
-        print("Saved page source to page_debug.html for inspection")
 
         # Select dropdown to show 100 entries 
         select_element = driver.find_element(By.CLASS_NAME, 'dt-input')
@@ -51,18 +45,34 @@ def scrape_dfpi_data(url):
         select.select_by_value('100')
         time.sleep(random.uniform(1, 2))  # Random sleep to mimic human behavior
 
+        # Initial load
         soup = BeautifulSoup(driver.page_source, 'html.parser')
         data = []
-        primary_subject = soup.select('td.column-1')
-        
-        if not primary_subject:
-            print("No td.column-1 elements found. Check page_debug.html for page structure.")
-            return []
 
-        print("Primary Subjects:")
-        for subject in primary_subject:
-            print(subject.get_text(strip=True))
-            data.append(subject.get_text(strip=True))
+        while(driver.find_element(By.CSS_SELECTOR, 'button.dt-paging-button.next')):            
+            primary_subject = soup.select('td.column-1')
+
+            # # Save page source for debugging
+            # with open("page_debug.html", "w") as f:
+            #     f.write(soup.prettify())
+            # print("Saved page source to page_debug.html for inspection")
+            
+            if not primary_subject:
+                print("No td.column-1 elements found. Check page_debug.html for page structure.")
+                return []
+
+            print("Primary Subjects:")
+            for subject in primary_subject:
+                print(subject.get_text(strip=True))
+                data.append(subject.get_text(strip=True))
+
+            # Go to next page
+            driver.find_element(By.CSS_SELECTOR, 'button.dt-paging-button.next').click()
+            time.sleep(random.uniform(1, 2))  # Random sleep to mimic human behavior
+            soup = BeautifulSoup(driver.page_source, 'html.parser')
+
+            if 'disabled' in driver.find_element(By.CSS_SELECTOR, 'button.dt-paging-button.next').get_attribute('class'):
+                break
         
         return data
     finally:
