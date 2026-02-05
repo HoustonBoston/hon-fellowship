@@ -47,29 +47,35 @@ def scrape_dfpi_data(url):
         soup = BeautifulSoup(driver.page_source, 'html.parser')
         data = []
 
-        while(driver.find_element(By.CSS_SELECTOR, 'button.dt-paging-button.next')):            
-            primary_subject = soup.select('td.column-1')
+        # Helper function to click through pages and scrape data
+        def start_scrape(soup):           
+                primary_subject = soup.select('td.column-1')
 
-            # # Save page source for debugging
-            # with open("page_debug.html", "w") as f:
-            #     f.write(soup.prettify())
-            # print("Saved page source to page_debug.html for inspection")
-            
-            if not primary_subject:
-                print("No td.column-1 elements found. Check page_debug.html for page structure.")
-                return []
+                # # Save page source for debugging
+                # with open("page_debug.html", "w") as f:
+                #     f.write(soup.prettify())
+                # print("Saved page source to page_debug.html for inspection")
+                
+                if not primary_subject:
+                    print("No td.column-1 elements found. Check page_debug.html for page structure.")
+                    return []
 
-            print("Primary Subjects:")
-            for subject in primary_subject:
-                print(subject.get_text(strip=True))
-                data.append(subject.get_text(strip=True))
+                print("Primary Subjects:")
+                for subject in primary_subject:
+                    print(subject.get_text(strip=True))
+                    data.append(subject.get_text(strip=True))
 
-            # Go to next page
-            driver.find_element(By.CSS_SELECTOR, 'button.dt-paging-button.next').click()
-            time.sleep(random.uniform(1, 2))  # Random sleep to mimic human behavior
-            soup = BeautifulSoup(driver.page_source, 'html.parser')
+                # Go to next page
+                driver.find_element(By.CSS_SELECTOR, 'button.dt-paging-button.next').click()
+                time.sleep(random.uniform(1, 2))  # Random sleep to mimic human behavior
+                soup = BeautifulSoup(driver.page_source, 'html.parser')
+
+        while(driver.find_element(By.CSS_SELECTOR, 'button.dt-paging-button.next')): 
+            start_scrape(soup)
 
             if 'disabled' in driver.find_element(By.CSS_SELECTOR, 'button.dt-paging-button.next').get_attribute('class'):
+                # Scrape one last time on the final page
+                start_scrape(soup)
                 break
         
         return data
