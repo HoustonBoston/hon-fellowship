@@ -22,8 +22,6 @@ def scrape_dfpi_data(url):
     
     try:
         driver.get(url)
-        # Wait for page to fully load and pass Cloudflare
-        time.sleep(5)
 
         # Wait up to 10s for the table cells to appear
         try:
