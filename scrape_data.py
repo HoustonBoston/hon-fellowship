@@ -29,11 +29,13 @@ def scrape_dfpi_data(url):
             WebDriverWait(driver, 10).until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, "td.column-1"))
             )
+
         except Exception:
             # Still save debug page and exit gracefully
             with open("page_debug.html", "w") as f:
                 soup_debug = BeautifulSoup(driver.page_source, 'html.parser')
                 f.write(soup_debug.prettify())
+            
             print("Timed out waiting for data. Saved page source to page_debug.html for inspection")
             return []
 
@@ -50,6 +52,9 @@ def scrape_dfpi_data(url):
         # Helper function to click through pages and scrape data
         def start_scrape(soup):           
                 primary_subject = soup.select('td.column-1')
+                complaint_narrative = soup.select('td.column-2')
+                scam_type = soup.select('td.column-3')
+                website = soup.select('td.column-4')
 
                 # # Save page source for debugging
                 # with open("page_debug.html", "w") as f:
@@ -59,11 +64,25 @@ def scrape_dfpi_data(url):
                 if not primary_subject:
                     print("No td.column-1 elements found. Check page_debug.html for page structure.")
                     return []
+                if not complaint_narrative:
+                    print("No td.column-2 elements found. Check page_debug.html for page structure.")
+                    return []
+                if not scam_type:
+                    print("No td.column-3 elements found. Check page_debug.html for page structure.")
+                    return []
+                if not website:
+                    print("No td.column-4 elements found. Check page_debug.html for page structure.")
+                    return []
 
-                print("Primary Subjects:")
-                for subject in primary_subject:
-                    print(subject.get_text(strip=True))
-                    data.append(subject.get_text(strip=True))
+                for subject, complaint_narrative, scam, site in zip(primary_subject, complaint_narrative, scam_type, website):
+                    data.append(
+                        {
+                            "complaint_narrative" : complaint_narrative.get_text(strip=True),
+                            "scam_type" : scam.get_text(strip=True),
+                            "primary_subject" : subject.get_text(strip=True),
+                            "website" : site.get_text(strip=True)
+                        }
+                    )
 
                 # Go to next page
                 driver.find_element(By.CSS_SELECTOR, 'button.dt-paging-button.next').click()
