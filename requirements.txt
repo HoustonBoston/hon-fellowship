@@ -4,3 +4,4 @@ selenium
 bs4
 undetected-chromedriver
 pandas
+matplotlib
