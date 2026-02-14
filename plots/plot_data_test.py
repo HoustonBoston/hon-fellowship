@@ -10,10 +10,10 @@ from matplotlib import pyplot as plt
 from pathlib import Path
 import sys
 
-DATA_DIR = Path("data")
+DATA_DIR = Path("../data")
 OUT_PNG = DATA_DIR / "scam_type_counts.png"
 
-df = pd.read_csv("data/dfpi_scams_exploded.csv")
+df = pd.read_csv("../data/dfpi_scams_exploded.csv")
 
 counts = df["scam_type_list"].value_counts().sort_values(ascending=False)
 

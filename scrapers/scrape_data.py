@@ -34,11 +34,11 @@ def scrape_dfpi_data(url):
 
         except Exception:
             # Still save debug page and exit gracefully
-            with open("page_debug.html", "w") as f:
+            with open("../page_debug.html", "w") as f:
                 soup_debug = BeautifulSoup(driver.page_source, 'html.parser')
                 f.write(soup_debug.prettify())
             
-            print("Timed out waiting for data. Saved page source to page_debug.html for inspection")
+            print("Timed out waiting for data. Saved page source to ../page_debug.html for inspection")
             return []
 
         # Select dropdown to show 100 entries 
@@ -59,21 +59,21 @@ def scrape_dfpi_data(url):
                 website = soup.select('td.column-4')
 
                 # # Save page source for debugging
-                # with open("page_debug.html", "w") as f:
+                # with open("../page_debug.html", "w") as f:
                 #     f.write(soup.prettify())
-                # print("Saved page source to page_debug.html for inspection")
+                # print("Saved page source to ../page_debug.html for inspection")
                 
                 if not primary_subject:
-                    print("No td.column-1 elements found. Check page_debug.html for page structure.")
+                    print("No td.column-1 elements found. Check ../page_debug.html for page structure.")
                     return []
                 if not complaint_narrative:
-                    print("No td.column-2 elements found. Check page_debug.html for page structure.")
+                    print("No td.column-2 elements found. Check ../page_debug.html for page structure.")
                     return []
                 if not scam_type:
-                    print("No td.column-3 elements found. Check page_debug.html for page structure.")
+                    print("No td.column-3 elements found. Check ../page_debug.html for page structure.")
                     return []
                 if not website:
-                    print("No td.column-4 elements found. Check page_debug.html for page structure.")
+                    print("No td.column-4 elements found. Check ../page_debug.html for page structure.")
                     return []
 
                 for subject, complaint_narrative, scam, site in zip(primary_subject, complaint_narrative, scam_type, website):
