@@ -5,3 +5,4 @@ bs4
 undetected-chromedriver
 pandas
 matplotlib
+PyQt6

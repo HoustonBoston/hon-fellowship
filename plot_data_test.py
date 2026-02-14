@@ -2,7 +2,10 @@
 
 import pandas as pd
 import matplotlib
-matplotlib.use("Qt5Agg")  
+import importlib.util
+# Prefer a Qt interactive backend when a Qt binding is available; otherwise use the
+# headless Agg backend so saving works in non-GUI environments.
+matplotlib.use("qtagg")
 from matplotlib import pyplot as plt
 from pathlib import Path
 import sys
@@ -19,9 +22,9 @@ ax.set_xlabel("Count")
 plt.tight_layout()
 
 # Save to file (works in headless environments); also try to show when possible
-OUT_PNG.parent.mkdir(parents=True, exist_ok=True)
-plt.savefig(OUT_PNG, bbox_inches="tight")
-print(f"Saved plot to: {OUT_PNG}")
+# OUT_PNG.parent.mkdir(parents=True, exist_ok=True)
+# plt.savefig(OUT_PNG, bbox_inches="tight")
+# print(f"Saved plot to: {OUT_PNG}")
 
 try:
 	plt.show()
