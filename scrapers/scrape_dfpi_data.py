@@ -106,15 +106,15 @@ def scrape_dfpi_data(url):
 # Function to write data to CSV 
 def write_to_csv(data):
     from pathlib import Path
-    Path("data").mkdir(parents=True, exist_ok=True)
+    Path("../data").mkdir(parents=True, exist_ok=True)
     keys = data[0].keys()
 
-    with open('data/dfpi_crypto_scam_data.csv', 'w', newline='', encoding='utf-8') as output_file:
+    with open('../data/dfpi_crypto_scam_data.csv', 'w', newline='', encoding='utf-8') as output_file:
         dict_writer = csv.DictWriter(output_file, fieldnames=keys)
         dict_writer.writeheader()
         dict_writer.writerows(data)
         
-    print("Data written to data/dfpi_crypto_scam_data.csv")
+    print("Data written to ../data/dfpi_crypto_scam_data.csv")
 
 if __name__ == '__main__':
     data = scrape_dfpi_data(URL)
