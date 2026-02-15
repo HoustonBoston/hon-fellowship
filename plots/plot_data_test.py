@@ -2,18 +2,17 @@
 
 import pandas as pd
 import matplotlib
-import importlib.util
-# Prefer a Qt interactive backend when a Qt binding is available; otherwise use the
-# headless Agg backend so saving works in non-GUI environments.
 matplotlib.use("qtagg")
 from matplotlib import pyplot as plt
 from pathlib import Path
 import sys
 
-DATA_DIR = Path("../data")
+# Resolve data directory relative to this script so script works from any cwd
+BASE_DIR = Path(__file__).resolve().parent.parent
+DATA_DIR = BASE_DIR / "data"
 OUT_PNG = DATA_DIR / "scam_type_counts.png"
 
-df = pd.read_csv("../data/dfpi_scams_exploded.csv")
+df = pd.read_csv(DATA_DIR / "dfpi_scams_exploded.csv")
 
 counts = df["scam_type_list"].value_counts().sort_values(ascending=False)
 

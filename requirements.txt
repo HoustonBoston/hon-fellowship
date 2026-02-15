@@ -1,7 +1,5 @@
 beautifulsoup4
-setuptools
 selenium
-bs4
 undetected-chromedriver
 pandas
 matplotlib
