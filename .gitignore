@@ -3,3 +3,4 @@
 *.ini
 *.deb
 data/*.png
+*/.env

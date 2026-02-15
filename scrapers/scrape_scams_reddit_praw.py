@@ -1,3 +1,0 @@
-#!/bin/.venv/python3
-
-
