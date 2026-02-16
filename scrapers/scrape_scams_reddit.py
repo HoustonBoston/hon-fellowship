@@ -95,9 +95,13 @@ def _is_rate_limited(driver: uc.Chrome) -> bool:
     src = driver.page_source.lower()
     indicators = [
         "this page isn't working",
-        "https_error"
+        "http error 429"
     ]
-    return any(ind in src for ind in indicators)
+
+    if any(ind in src for ind in indicators):
+        print(src[:200])
+        return True
+    return False
 
 
 def safe_get(driver: uc.Chrome, url: str) -> None:
@@ -115,12 +119,13 @@ def safe_get(driver: uc.Chrome, url: str) -> None:
 
     sleep_random()
 
+    # First actually load page
+    driver.get(url)
+
     cooldown = COOLDOWN_BASE
 
     for attempt in range(1, MAX_RETRIES + 1):
-        driver.get(url)
         # return  # temporarily
-        # sleep_random()
 
         if not _is_rate_limited(driver):
             return  # success — page loaded normally
@@ -133,13 +138,16 @@ def safe_get(driver: uc.Chrome, url: str) -> None:
         time.sleep(cooldown)
         cooldown = min(cooldown * 2, COOLDOWN_MAX)  # exponential back-off
 
+        # Refresh page
+        driver.refresh()
+
     # If we exhausted all retries, raise so the caller can decide what to do.
     raise RuntimeError(
         f"Still rate-limited after {MAX_RETRIES} retries for URL: {url}"
     )
 
 def sleep_random():
-    sleep_t = random.triangular(1, 4, 3)
+    sleep_t = random.triangular(1, 4, 2.5)
     print(f"sleeping for {sleep_t:.2f} seconds …")
     time.sleep(sleep_t)    # be polite and avoid hammering the server
 
