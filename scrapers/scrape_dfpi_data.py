@@ -20,7 +20,7 @@ def scrape_dfpi_data(url):
     options = uc.ChromeOptions()
     options.add_argument('--headless=new')
     
-    driver = uc.Chrome(version_main=144, headless=False, use_subprocess=True)
+    driver = uc.Chrome(headless=False, use_subprocess=True)
     
     try:
         driver.get(url)

@@ -10,22 +10,21 @@ to scroll through pages and expand comment trees, then parse the fully
 rendered HTML with BeautifulSoup.
 
 Usage:
-    python scrape_scams_reddit_scraperapi.py
-    python scrape_scams_reddit_scraperapi.py --subreddit cryptocurrency --max-posts 50
+    python scrape_scams_reddit.py
+    python scrape_scams_reddit.py --subreddit cryptocurrency --max-posts 50
 """
 
 import argparse
 import json
 import os
 import time
+import random
 from datetime import datetime
+import undetected_chromedriver as uc
+from selenium_stealth import stealth
 
 from bs4 import BeautifulSoup
-from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import (
     StaleElementReferenceException,
     ElementClickInterceptedException,
@@ -45,21 +44,21 @@ WAIT_TIMEOUT = 10
 
 # Pause between requests so we stay under 100 requests / minute.
 # 60s ÷ 100 = 0.6s minimum gap; we use 0.65s for a small safety margin.
-POLITE_DELAY = 0.65
+POLITE_DELAY = 1
 
 # Rate-limit (HTTP 429) cooldown settings.
 # When Reddit returns a 429, we wait COOLDOWN_BASE seconds and then
 # double the wait on each consecutive 429, up to COOLDOWN_MAX seconds.
 COOLDOWN_BASE = 30      # initial cooldown in seconds
 COOLDOWN_MAX = 300      # maximum cooldown (5 minutes)
-MAX_RETRIES = 5          # give up after this many consecutive 429s
+MAX_RETRIES = 50          # give up after this many consecutive 429s
 
 
 # ---------------------------------------------------------------------------
 # Browser helpers
 # ---------------------------------------------------------------------------
 
-def create_driver() -> webdriver.Chrome:
+def create_driver() -> uc.Chrome:
     """
     Create and return a headless Chrome WebDriver instance.
 
@@ -67,20 +66,23 @@ def create_driver() -> webdriver.Chrome:
     A custom User-Agent is set so Reddit doesn't serve a stripped-down
     page intended for bots.
     """
-    options = webdriver.ChromeOptions()
-    options.add_argument("--disable-gpu")           # required on some Linux systems
-    options.add_argument("--no-sandbox")            # needed inside Docker / CI
-    options.add_argument("--disable-dev-shm-usage") # prevent /dev/shm OOM errors
-    options.add_argument("--window-size=1920,1080") # ensure full-width rendering
+    options = uc.ChromeOptions()
     options.add_argument(
         "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     )
-    driver = webdriver.Chrome(options=options)
+    options.add_argument('--incognito')
+
+    driver = uc.Chrome(headless=False, use_subprocess=True, options=options)
+    stealth(driver,
+            languages=["en-US", "en"],
+            vendor="Google Inc.",
+            platform="Win32"
+    )
     return driver
 
 
-def _is_rate_limited(driver: webdriver.Chrome) -> bool:
+def _is_rate_limited(driver: uc.Chrome) -> bool:
     """
     Check whether the current page is a Reddit 429 rate-limit response.
 
@@ -92,29 +94,33 @@ def _is_rate_limited(driver: webdriver.Chrome) -> bool:
     # Checking page_source is cheap — no extra network request.
     src = driver.page_source.lower()
     indicators = [
-        "429",
-        "too many requests",
-        "you are doing that too much",
-        "try again in",
+        "this page isn't working",
+        "https_error"
     ]
     return any(ind in src for ind in indicators)
 
 
-def safe_get(driver: webdriver.Chrome, url: str) -> None:
+def safe_get(driver: uc.Chrome, url: str) -> None:
     """
     Navigate to *url* with automatic retry + exponential back-off when
     Reddit returns an HTTP 429 (rate-limit) page.
 
     After each failed attempt the function sleeps for an exponentially
-    increasing duration (COOLDOWN_BASE, 2×, 4×, … capped at
+    increasing duration (COOLDOWN_BASE, 2x, 4x, … capped at
     COOLDOWN_MAX) before retrying.  Raises RuntimeError after
     MAX_RETRIES consecutive failures.
     """
+
+    print("safely getting")
+
+    sleep_random()
+
     cooldown = COOLDOWN_BASE
 
     for attempt in range(1, MAX_RETRIES + 1):
         driver.get(url)
-        time.sleep(POLITE_DELAY)
+        # return  # temporarily
+        # sleep_random()
 
         if not _is_rate_limited(driver):
             return  # success — page loaded normally
@@ -132,12 +138,17 @@ def safe_get(driver: webdriver.Chrome, url: str) -> None:
         f"Still rate-limited after {MAX_RETRIES} retries for URL: {url}"
     )
 
+def sleep_random():
+    sleep_t = random.triangular(1, 4, 3)
+    print(f"sleeping for {sleep_t:.2f} seconds …")
+    time.sleep(sleep_t)    # be polite and avoid hammering the server
+
 
 # ---------------------------------------------------------------------------
 # Subreddit listing scraper  (grabs post URLs)
 # ---------------------------------------------------------------------------
 
-def scrape_post_urls(driver: webdriver.Chrome, subreddit: str,
+def scrape_post_urls(driver: uc.Chrome, subreddit: str,
                     max_posts: int = 10000) -> list[str]:
     """
     Scroll through the subreddit listing on old.reddit.com and collect
@@ -263,7 +274,7 @@ def parse_comment(comment_div, depth: int = 0) -> dict | None:
 # Single-post scraper  (post metadata + full comment tree)
 # ---------------------------------------------------------------------------
 
-def expand_hidden_comments(driver: webdriver.Chrome) -> None:
+def expand_hidden_comments(driver: uc.Chrome) -> None:
     """
     Click all "load more comments" and "[+] expand" links on the page so
     that Selenium renders the complete comment tree before we hand the
@@ -286,7 +297,7 @@ def expand_hidden_comments(driver: webdriver.Chrome) -> None:
                 try:
                     driver.execute_script("arguments[0].click();", link)
                     clicked_any = True
-                    time.sleep(POLITE_DELAY)
+                    sleep_random()
                 except (StaleElementReferenceException,
                         ElementClickInterceptedException):
                     # Element may have been replaced by newly loaded HTML.
@@ -299,7 +310,7 @@ def expand_hidden_comments(driver: webdriver.Chrome) -> None:
             break
 
 
-def scrape_post(driver: webdriver.Chrome, post_url: str) -> dict:
+def scrape_post(driver: uc.Chrome, post_url: str) -> dict:
     """
     Navigate to a single Reddit post, expand all comments, and return a
     structured dictionary containing the post metadata and the full
@@ -307,7 +318,7 @@ def scrape_post(driver: webdriver.Chrome, post_url: str) -> dict:
 
     Parameters
     ----------
-    driver : webdriver.Chrome
+    driver : uc.Chrome
         An active Selenium WebDriver session.
     post_url : str
         The full URL of the Reddit post to scrape.
@@ -454,6 +465,7 @@ def main():
 
     try:
         # --- Step 1: collect post URLs from the subreddit listing ----------
+        print("scrape_post_urls called")
         post_urls = scrape_post_urls(driver, args.subreddit, args.max_posts)
 
         # --- Step 2: scrape each post and its comments ---------------------
@@ -467,7 +479,7 @@ def main():
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         json_path = os.path.join(
             args.output_dir,
-            f"..data//reddit_r{args.subreddit}_{timestamp}.json",
+            f"../data/reddit_r{args.subreddit}_{timestamp}.json",
         )
         with open(json_path, "w", encoding="utf-8") as f:
             json.dump(all_posts, f, indent=2, ensure_ascii=False)
