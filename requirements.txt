@@ -4,5 +4,4 @@ undetected-chromedriver
 pandas
 matplotlib
 PyQt6
-setuptools
 selenium-stealth
