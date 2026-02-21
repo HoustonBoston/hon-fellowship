@@ -10,8 +10,8 @@ to scroll through pages and expand comment trees, then parse the fully
 rendered HTML with BeautifulSoup.
 
 Usage:
-    python scrape_scams_reddit.py
-    python scrape_scams_reddit.py --subreddit cryptocurrency --max-posts 50
+    python scrape_CryptoCurrency_reddit.py
+    python scrape_CryptoCurrency_reddit.py --subreddit CryptoCurrency --max-posts 50
 """
 
 import argparse
@@ -37,7 +37,7 @@ from selenium.common.exceptions import (
 # Use old.reddit.com — its HTML structure is simpler and more stable for
 # scraping than the new React-based UI.
 BASE_URL = "https://old.reddit.com"
-DEFAULT_SUBREDDIT = "Scams"
+DEFAULT_SUBREDDIT = "CryptoCurrency"
 
 # How many seconds to wait for elements to appear before giving up.
 WAIT_TIMEOUT = 10
