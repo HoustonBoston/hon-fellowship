@@ -19,7 +19,7 @@ import json
 import os
 import time
 import random
-from datetime import datetime
+from datetime import datetime, timezone, timezone
 import undetected_chromedriver as uc
 from selenium_stealth import stealth
 
@@ -203,6 +203,118 @@ def scrape_post_urls(driver: uc.Chrome, subreddit: str,
 
     print(f"[listing] Collected {len(collected_urls)} post URLs.")
     return collected_urls
+
+
+# ---------------------------------------------------------------------------
+# Date-range chunked listing scraper  (bypasses the 1,000-post cap)
+# ---------------------------------------------------------------------------
+
+def _scrape_chunk(
+    driver: uc.Chrome,
+    subreddit: str,
+    start_ts: int,
+    end_ts: int,
+) -> list[str]:
+    """
+    Fetch all post URLs whose creation timestamp falls in [start_ts, end_ts]
+    using Reddit's CloudSearch syntax::
+
+        /r/<sub>/search/?q=timestamp:<start>..<end>&syntax=cloudsearch
+
+    Paginates through all result pages and returns a flat list of URLs.
+    If the window contains >1,000 posts Reddit will still cap at 1,000;
+    the caller (``scrape_post_urls_chunked``) detects that and bisects.
+    """
+    urls: list[str] = []
+    page_url: str | None = (
+        f"{BASE_URL}/r/{subreddit}/search/"
+        f"?q=timestamp%3A{start_ts}..{end_ts}"
+        f"&sort=new&restrict_sr=on&syntax=cloudsearch"
+    )
+
+    while page_url:
+        print(f"  [chunk] {start_ts}..{end_ts} | loading: {page_url}")
+        safe_get(driver, page_url)
+        soup = BeautifulSoup(driver.page_source, "html.parser")
+
+        for thing in soup.select("div.thing"):
+            if "stickied" in thing.get("class", []) or "promoted" in thing.get("class", []):
+                continue
+            link_tag = thing.select_one("a.comments")
+            if link_tag and link_tag.get("href"):
+                full_url = link_tag["href"]
+                if not full_url.startswith("http"):
+                    full_url = BASE_URL + full_url
+                urls.append(full_url)
+
+        next_btn = soup.select_one("span.next-button a")
+        page_url = next_btn["href"] if next_btn else None
+
+    print(f"  [chunk] {start_ts}..{end_ts} → {len(urls)} posts")
+    return urls
+
+
+def scrape_post_urls_chunked(
+    driver: uc.Chrome,
+    subreddit: str,
+    start_ts: int,
+    end_ts: int,
+    max_posts: int = 10_000,
+) -> list[str]:
+    """
+    Collect post URLs across an arbitrarily large time span by splitting
+    ``[start_ts, end_ts]`` into timestamp windows and querying each one.
+
+    Any window that returns exactly 1,000 results has hit Reddit's hard cap
+    and is automatically **bisected** — each half is pushed back onto the
+    work stack and retried independently.  This recurses until every window
+    returns < 1,000 posts, guaranteeing no posts are silently skipped.
+
+    Parameters
+    ----------
+    start_ts, end_ts : int
+        Unix timestamps (seconds) defining the overall date range.
+    max_posts : int
+        Stop early once this many unique URLs have been collected.
+
+    Returns
+    -------
+    list[str]
+        Deduplicated list of post URLs, capped at *max_posts*.
+    """
+    collected: list[str] = []
+    seen: set[str] = set()
+
+    # Stack of (start, end) windows still to process — process newest first.
+    stack: list[tuple[int, int]] = [(start_ts, end_ts)]
+
+    while stack and len(collected) < max_posts:
+        chunk_start, chunk_end = stack.pop()
+        chunk_urls = _scrape_chunk(driver, subreddit, chunk_start, chunk_end)
+
+        if len(chunk_urls) >= 1000:
+            # Hit the cap — bisect the window and retry both halves.
+            mid = (chunk_start + chunk_end) // 2
+            if mid == chunk_start:
+                # Window is a single second; can't split further — accept as-is.
+                print(f"  [chunk] Window {chunk_start}..{chunk_end} unsplittable, keeping {len(chunk_urls)} posts.")
+                for u in chunk_urls:
+                    if u not in seen:
+                        seen.add(u)
+                        collected.append(u)
+            else:
+                print(f"  [chunk] Cap hit — bisecting into {chunk_start}..{mid} and {mid+1}..{chunk_end}")
+                # Push newer half first so we pop it last (chronological order).
+                stack.append((mid + 1, chunk_end))
+                stack.append((chunk_start, mid))
+        else:
+            for u in chunk_urls:
+                if u not in seen:
+                    seen.add(u)
+                    collected.append(u)
+
+    print(f"[chunked] Collected {len(collected)} unique post URLs.")
+    return collected[:max_posts]
 
 
 # ---------------------------------------------------------------------------
@@ -463,6 +575,21 @@ def main():
         action="store_true",
         help="Also export a flat CSV of all comments.",
     )
+    parser.add_argument(
+        "--chunked",
+        action="store_true",
+        help="Use date-range chunking to bypass Reddit's 1,000-post listing cap.",
+    )
+    parser.add_argument(
+        "--start-date",
+        default="2010-01-01",
+        help="Earliest post date for chunked mode, YYYY-MM-DD (default: %(default)s).",
+    )
+    parser.add_argument(
+        "--end-date",
+        default=None,
+        help="Latest post date for chunked mode, YYYY-MM-DD (default: today).",
+    )
     args = parser.parse_args()
 
     # --- Ensure output directory exists ------------------------------------
@@ -474,8 +601,23 @@ def main():
 
     try:
         # --- Step 1: collect post URLs from the subreddit listing ----------
-        print("scrape_post_urls called")
-        post_urls = scrape_post_urls(driver, args.subreddit, args.max_posts)
+        if args.chunked:
+            start_dt = datetime.strptime(args.start_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            end_dt = (
+                datetime.strptime(args.end_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                if args.end_date
+                else datetime.now(timezone.utc)
+            )
+            start_ts = int(start_dt.timestamp())
+            end_ts = int(end_dt.timestamp())
+            print(f"[init] Chunked mode: {args.start_date} → {args.end_date or 'today'} "
+                  f"({start_ts} → {end_ts})")
+            post_urls = scrape_post_urls_chunked(
+                driver, args.subreddit, start_ts, end_ts, args.max_posts
+            )
+        else:
+            print("scrape_post_urls called")
+            post_urls = scrape_post_urls(driver, args.subreddit, args.max_posts)
 
         # --- Step 2: scrape each post and its comments ---------------------
         all_posts: list[dict] = []
