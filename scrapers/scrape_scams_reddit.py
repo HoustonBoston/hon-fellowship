@@ -246,7 +246,7 @@ def scrape_post_urls_chunked(
     subreddit: str,
     start_ts: int,
     end_ts: int,
-    max_posts: int = 10_000,
+    max_posts: int = 100_000,
 ) -> list[str]:
     """
     Collect post URLs for *subreddit* between *start_ts* and *end_ts* using
