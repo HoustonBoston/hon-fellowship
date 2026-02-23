@@ -556,7 +556,7 @@ def main():
     parser.add_argument(
         "--max-posts", "-n",
         type=int,
-        default=10000,
+        default=100_000,
         help="Maximum number of posts to scrape (default: %(default)s).",
     )
     parser.add_argument(
