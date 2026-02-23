@@ -296,11 +296,13 @@ def scrape_post_urls_chunked(
         # Advance cursor: next page must be strictly older than this page's oldest post.
         oldest_ts = min(int(p["created_utc"]) for p in posts)
         if oldest_ts <= start_ts:
+            print("  [arctic] Reached the start of the requested date range. Breaking out of loop.")
             break  # reached the start of the requested range
         before_ts = oldest_ts  # Arctic Shift's `before` is exclusive
 
         # Fewer results than limit means we've exhausted this range.
         if len(posts) < ARCTIC_SHIFT_LIMIT:
+            print("  [arctic] Fetched fewer posts than the API limit, likely reached the end of available data.")
             break
 
         sleep_random()
