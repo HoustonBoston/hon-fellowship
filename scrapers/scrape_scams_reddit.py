@@ -235,8 +235,7 @@ def _fetch_arctic_shift_page(
         "after": str(after_ts),
         "before": str(before_ts),
         "limit": str(ARCTIC_SHIFT_LIMIT),
-        "sort": "created_utc",
-        "order": "desc",
+        "sort": "desc",  # sort direction by created_utc (newest first)
     }
     resp = session.get(ARCTIC_SHIFT_API, params=params, timeout=30)
     resp.raise_for_status()
