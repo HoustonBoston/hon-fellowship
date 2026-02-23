@@ -19,7 +19,8 @@ import json
 import os
 import time
 import random
-from datetime import datetime, timezone, timezone
+from datetime import datetime, timezone
+import requests
 import undetected_chromedriver as uc
 from selenium_stealth import stealth
 
@@ -52,6 +53,10 @@ POLITE_DELAY = 1
 COOLDOWN_BASE = 30      # initial cooldown in seconds
 COOLDOWN_MAX = 300      # maximum cooldown (5 minutes)
 MAX_RETRIES = 50          # give up after this many consecutive 429s
+
+# Arctic Shift API (replaces dead CloudSearch for historical post listing).
+ARCTIC_SHIFT_API = "https://arctic-shift.photon-reddit.com/api/posts/search"
+ARCTIC_SHIFT_LIMIT = 100  # max results per request the API supports
 
 
 # ---------------------------------------------------------------------------
@@ -206,114 +211,102 @@ def scrape_post_urls(driver: uc.Chrome, subreddit: str,
 
 
 # ---------------------------------------------------------------------------
-# Date-range chunked listing scraper  (bypasses the 1,000-post cap)
+# Date-range chunked listing scraper  (uses Arctic Shift API)
 # ---------------------------------------------------------------------------
 
-def _scrape_chunk(
-    driver: uc.Chrome,
+def _fetch_arctic_shift_page(
+    session: requests.Session,
     subreddit: str,
-    start_ts: int,
-    end_ts: int,
-) -> list[str]:
+    after_ts: int,
+    before_ts: int,
+) -> list[dict]:
     """
-    Fetch all post URLs whose creation timestamp falls in [start_ts, end_ts]
-    using Reddit's CloudSearch syntax::
+    Fetch one page of posts from the Arctic Shift public API.
 
-        /r/<sub>/search/?q=timestamp:<start>..<end>&syntax=cloudsearch
+    Arctic Shift is a third-party Reddit archive with no authentication
+    requirement and proper timestamp filtering — unlike Reddit's own
+    CloudSearch which was removed in 2023.
 
-    Paginates through all result pages and returns a flat list of URLs.
-    If the window contains >1,000 posts Reddit will still cap at 1,000;
-    the caller (``scrape_post_urls_chunked``) detects that and bisects.
+    Returns a list of raw post dicts from the API response.
+    Raises requests.HTTPError on non-2xx responses.
     """
-    urls: list[str] = []
-    page_url: str | None = (
-        f"{BASE_URL}/r/{subreddit}/search/"
-        f"?q=timestamp%3A{start_ts}..{end_ts}"
-        f"&sort=new&restrict_sr=on&syntax=cloudsearch"
-    )
-
-    while page_url:
-        print(f"  [chunk] {start_ts}..{end_ts} | loading: {page_url}")
-        safe_get(driver, page_url)
-        soup = BeautifulSoup(driver.page_source, "html.parser")
-
-        for thing in soup.select("div.thing"):
-            if "stickied" in thing.get("class", []) or "promoted" in thing.get("class", []):
-                continue
-            link_tag = thing.select_one("a.comments")
-            if link_tag and link_tag.get("href"):
-                full_url = link_tag["href"]
-                if not full_url.startswith("http"):
-                    full_url = BASE_URL + full_url
-                urls.append(full_url)
-
-        next_btn = soup.select_one("span.next-button a")
-        page_url = next_btn["href"] if next_btn else None
-
-    print(f"  [chunk] {start_ts}..{end_ts} → {len(urls)} posts")
-    return urls
+    params = {
+        "subreddit": subreddit,
+        "after": str(after_ts),
+        "before": str(before_ts),
+        "limit": str(ARCTIC_SHIFT_LIMIT),
+        "sort": "created_utc",
+        "order": "desc",
+    }
+    resp = session.get(ARCTIC_SHIFT_API, params=params, timeout=30)
+    resp.raise_for_status()
+    return resp.json().get("data", [])
 
 
 def scrape_post_urls_chunked(
-    driver: uc.Chrome,
     subreddit: str,
     start_ts: int,
     end_ts: int,
     max_posts: int = 10_000,
 ) -> list[str]:
     """
-    Collect post URLs across an arbitrarily large time span by splitting
-    ``[start_ts, end_ts]`` into timestamp windows and querying each one.
+    Collect post URLs for *subreddit* between *start_ts* and *end_ts* using
+    the Arctic Shift API with cursor-based pagination.
 
-    Any window that returns exactly 1,000 results has hit Reddit's hard cap
-    and is automatically **bisected** — each half is pushed back onto the
-    work stack and retried independently.  This recurses until every window
-    returns < 1,000 posts, guaranteeing no posts are silently skipped.
+    We walk backwards in time from *end_ts* to *start_ts*, using the oldest
+    ``created_utc`` in each page as the ``before`` cursor for the next
+    request.  This avoids Reddit's 1,000-post listing cap entirely because
+    Arctic Shift is a separate archive with no such restriction.
 
     Parameters
     ----------
+    subreddit : str
+        Subreddit name (without r/).
     start_ts, end_ts : int
-        Unix timestamps (seconds) defining the overall date range.
+        Unix timestamps (seconds) defining the date range.
     max_posts : int
         Stop early once this many unique URLs have been collected.
 
     Returns
     -------
     list[str]
-        Deduplicated list of post URLs, capped at *max_posts*.
+        Deduplicated list of full old.reddit.com post URLs.
     """
     collected: list[str] = []
     seen: set[str] = set()
+    session = requests.Session()
+    session.headers["User-Agent"] = "hon-fellowship-scraper/1.0"
 
-    # Stack of (start, end) windows still to process — process newest first.
-    stack: list[tuple[int, int]] = [(start_ts, end_ts)]
+    before_ts = end_ts
 
-    while stack and len(collected) < max_posts:
-        chunk_start, chunk_end = stack.pop()
-        chunk_urls = _scrape_chunk(driver, subreddit, chunk_start, chunk_end)
+    while len(collected) < max_posts:
+        print(f"  [arctic] Fetching r/{subreddit} | before={before_ts} after={start_ts} …")
+        posts = _fetch_arctic_shift_page(session, subreddit, start_ts, before_ts)
 
-        if len(chunk_urls) >= 1000:
-            # Hit the cap — bisect the window and retry both halves.
-            mid = (chunk_start + chunk_end) // 2
-            if mid == chunk_start:
-                # Window is a single second; can't split further — accept as-is.
-                print(f"  [chunk] Window {chunk_start}..{chunk_end} unsplittable, keeping {len(chunk_urls)} posts.")
-                for u in chunk_urls:
-                    if u not in seen:
-                        seen.add(u)
-                        collected.append(u)
-            else:
-                print(f"  [chunk] Cap hit — bisecting into {chunk_start}..{mid} and {mid+1}..{chunk_end}")
-                # Push newer half first so we pop it last (chronological order).
-                stack.append((mid + 1, chunk_end))
-                stack.append((chunk_start, mid))
-        else:
-            for u in chunk_urls:
-                if u not in seen:
-                    seen.add(u)
-                    collected.append(u)
+        if not posts:
+            break  # no more results in this range
 
-    print(f"[chunked] Collected {len(collected)} unique post URLs.")
+        for post in posts:
+            permalink = post.get("permalink", "")
+            if permalink:
+                url = f"https://old.reddit.com{permalink}"
+                if url not in seen:
+                    seen.add(url)
+                    collected.append(url)
+
+        # Advance cursor: next page must be strictly older than this page's oldest post.
+        oldest_ts = min(int(p["created_utc"]) for p in posts)
+        if oldest_ts <= start_ts:
+            break  # reached the start of the requested range
+        before_ts = oldest_ts  # Arctic Shift's `before` is exclusive
+
+        # Fewer results than limit means we've exhausted this range.
+        if len(posts) < ARCTIC_SHIFT_LIMIT:
+            break
+
+        sleep_random()
+
+    print(f"[arctic] Collected {len(collected)} unique post URLs.")
     return collected[:max_posts]
 
 
@@ -613,7 +606,7 @@ def main():
             print(f"[init] Chunked mode: {args.start_date} → {args.end_date or 'today'} "
                   f"({start_ts} → {end_ts})")
             post_urls = scrape_post_urls_chunked(
-                driver, args.subreddit, start_ts, end_ts, args.max_posts
+                args.subreddit, start_ts, end_ts, args.max_posts
             )
         else:
             print("scrape_post_urls called")
