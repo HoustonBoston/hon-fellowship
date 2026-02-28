@@ -313,6 +313,8 @@ def scrape_post_urls_chunked(
 
 # ---------------------------------------------------------------------------
 # Comment parser  (recursive, handles arbitrary nesting)
+#
+# WARNING: Currently does not collect nested replies.
 # ---------------------------------------------------------------------------
 
 def parse_comment(comment_div, depth: int = 0) -> dict | None:
@@ -412,7 +414,7 @@ def expand_hidden_comments(driver: uc.Chrome) -> None:
                 try:
                     driver.execute_script("arguments[0].click();", link)
                     clicked_any = True
-                    sleep_random()
+                    # sleep_random()    # Remove small delay to speed up loading all comments
                 except (StaleElementReferenceException,
                         ElementClickInterceptedException):
                     # Element may have been replaced by newly loaded HTML.

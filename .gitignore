@@ -2,5 +2,5 @@
 *.png
 *.ini
 *.deb
-data/*.png
+scrapers/data/*
 */.env
