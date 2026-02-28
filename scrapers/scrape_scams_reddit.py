@@ -79,7 +79,7 @@ def create_driver() -> uc.Chrome:
     options.add_argument('--incognito')
     options.add_argument('--headless=new')  # Use new headless mode for better compatibility
 
-    driver = uc.Chrome(headless=True, use_subprocess=True, options=options)
+    driver = uc.Chrome(headless=True, use_subprocess=True, options=options, version_main=145)
     stealth(driver,
             languages=["en-US", "en"],
             vendor="Google Inc.",
@@ -556,6 +556,10 @@ def main():
         help="Name of the subreddit to scrape (default: %(default)s).",
     )
     parser.add_argument(
+        "--post", "-p",
+        help="Scrape a single post by URL (overrides --subreddit and --max-posts).",
+    )
+    parser.add_argument(
         "--max-posts", "-n",
         type=int,
         default=100_000,
@@ -595,7 +599,26 @@ def main():
     print("[init] Starting headless Chrome …")
     driver = create_driver()
 
+    # Helper to save the collected posts to a JSON file with a timestamped name.
+    def save_json(all_posts: list[dict], post_or_subreddit: str):
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            json_path = os.path.join(
+                args.output_dir,
+                f"../data/reddit_r{post_or_subreddit}_{timestamp}.json",
+            )
+            with open(json_path, "w", encoding="utf-8") as f:
+                json.dump(all_posts, f, indent=2, ensure_ascii=False)
+            print(f"[done] Saved {len(all_posts)} posts → {json_path}")
+
     try:
+        # For posts only
+        if args.post:
+            print(f"[init] Single post mode: {args.post}")
+            post_data = scrape_post(driver, args.post)
+            all_posts = [post_data]
+            save_json(all_posts, post_or_subreddit=args.post.split("/")[-1])
+
+            return  # Skip the rest of the flow since we're only doing one post
         # --- Step 1: collect post URLs from the subreddit listing ----------
         if args.chunked:
             start_dt = datetime.strptime(args.start_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
@@ -623,19 +646,12 @@ def main():
             all_posts.append(post_data)
 
         # --- Step 3: write results to JSON ---------------------------------
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        json_path = os.path.join(
-            args.output_dir,
-            f"../data/reddit_r{args.subreddit}_{timestamp}.json",
-        )
-        with open(json_path, "w", encoding="utf-8") as f:
-            json.dump(all_posts, f, indent=2, ensure_ascii=False)
-        print(f"[done] Saved {len(all_posts)} posts → {json_path}")
+        save_json(all_posts, post_or_subreddit=args.subreddit)
 
         # --- Step 4 (optional): write flat CSV -----------------------------
         if args.csv:
             import csv
-
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             csv_path = os.path.join(
                 args.output_dir,
                 f"../data/reddit_r{args.subreddit}_comments_{timestamp}.csv",
