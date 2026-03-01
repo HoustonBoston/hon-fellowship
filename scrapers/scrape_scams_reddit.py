@@ -357,7 +357,7 @@ def parse_comment(comment_div, depth: int = 0) -> dict | None:
     permalink = permalink_tag["href"] if permalink_tag else ""
 
     # Skip completely empty / deleted comments with no replies
-    if not body and author == "[deleted]":
+    if not body and "Removed" in author or "Deleted" in author:
         # Still parse children — sometimes a deleted parent has live replies
         pass
 
@@ -366,15 +366,19 @@ def parse_comment(comment_div, depth: int = 0) -> dict | None:
     # contains its own list of <div class="comment"> elements.
     replies: list[dict] = []
     child_area = comment_div.select_one("div.child")
+    # print("child area: ", child_area)
     if child_area:
+        print("child area found, looking for child comments …")
         # Direct children only (recursive=False) to avoid double-counting
         # deeper levels — each level calls parse_comment on its own children.
-        for child_comment in child_area.find_all(
-            "div", class_="comment", recursive=False
-        ):
-            parsed = parse_comment(child_comment, depth=depth + 1)
-            if parsed:
-                replies.append(parsed)
+        child_comments = child_area.select(":scope > div.sitetable > div.comment")
+        if child_comments:
+            print("Found child_comments")
+            for child_comment in child_comments:
+                print("parsing child comment at depth", depth + 1)
+                parsed = parse_comment(child_comment, depth=depth + 1)
+                if parsed:
+                    replies.append(parsed)
 
     return {
         "author": author,
