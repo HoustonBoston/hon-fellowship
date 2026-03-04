@@ -6,3 +6,4 @@ matplotlib
 PyQt6
 selenium-stealth
 setuptools
+requests
