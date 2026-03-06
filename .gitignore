@@ -4,3 +4,4 @@
 *.deb
 scrapers/data/*
 */.env
+**/*.json*
