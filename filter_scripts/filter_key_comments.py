@@ -2,13 +2,17 @@
 import argparse
 import json
 from datetime import datetime, timezone
-
-with open("./data/r_CryptoScams2020-2025_comments.jsonl", "r", encoding="utf-8") as f:
-    data = [json.loads(line) for line in f if line.strip()]
+from pathlib import Path
 
 parser = argparse.ArgumentParser(description="Filter Reddit posts for specific keywords.")
 parser.add_argument("--keywords", "-k", nargs="+", default=["romance scam", "pig butchering"], help="Keywords to filter posts by")
+parser.add_argument("--input", "-i", default="./data/r_CryptoScams2020-2025_comments.jsonl", help="Input file path")
 args = parser.parse_args()
+
+path = Path(args.input)
+
+with open(path, "r", encoding="utf-8") as f:
+    data = [json.loads(line) for line in f if line.strip()]
 
 # Filter for keywords ("romance scam", "pig butchering")
 keywords = set(args.keywords)
@@ -42,6 +46,10 @@ filtered_comments = [
     and comment.get("body", "").strip() != ""
 ]
 
-with open("./data/filtered_CryptoScams_2020-2025_comments.jsonl", "w", encoding="utf-8") as f:
+#ex: if path.name is r_CryptoScams_2020-2025_comments.jsonl, filename will be CryptoScams
+filename = path.name.split(".")[0].split('_')[1]
+output_dir = Path(__file__).resolve().parent.parent / filename / "data"  
+output_dir.mkdir(parents=True, exist_ok=True)
+with open(output_dir / f"filtered_{path.name}", "w", encoding="utf-8") as f:
     for comment in filtered_comments:
         f.write(json.dumps(comment) + "\n")

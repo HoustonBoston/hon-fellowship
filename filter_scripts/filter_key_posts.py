@@ -1,16 +1,22 @@
 # Open file
 import json
+import os
 from datetime import datetime, timezone
+from pathlib import Path
 import argparse
+from posixpath import relpath
 
 parser = argparse.ArgumentParser(description="Filter Reddit posts for specific keywords.")
 parser.add_argument("--keywords", "-k", nargs="+", default=["romance scam", "pig butchering"], help="Keywords to filter posts by")
+parser.add_argument("--input", "-i", default="r_CryptoScams2020-2025_posts.jsonl", help="Input file path")
 args = parser.parse_args()
+
+path = Path(args.input)
 
 # Filter for keywords ("romance scam", "pig butchering")
 keywords = set(args.keywords)
 
-with open("./data/r_CryptoScams2020-2025_posts.jsonl", "r", encoding="utf-8") as f:
+with open(path, "r", encoding="utf-8") as f:
     data = [json.loads(line) for line in f if line.strip()]
 
 def post_matches(post):
@@ -43,6 +49,12 @@ filtered_posts = [
     and post.get("selftext", "").strip() != ""
 ]
 
-with open("./data/filtered_CryptoScams_2020-2025_posts.jsonl", "w", encoding="utf-8") as f:
+
+#ex: if path.name is r_CryptoScams_2020-2025_posts.jsonl, filename will be CryptoScams
+filename = path.name.split(".")[0].split('_')[1]
+# parent of this file
+output_dir = Path(__file__).resolve().parent.parent / filename / "data"  
+output_dir.mkdir(parents=True, exist_ok=True)
+with open(output_dir / f"filtered_{path.name}", "w", encoding="utf-8") as f:
     for post in filtered_posts:
         f.write(json.dumps(post) + "\n")
