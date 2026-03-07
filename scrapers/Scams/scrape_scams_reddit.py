@@ -10,8 +10,8 @@ to scroll through pages and expand comment trees, then parse the fully
 rendered HTML with BeautifulSoup.
 
 Usage:
-    python scrape_CryptoScams_reddit.py
-    python scrape_CryptoScams_reddit.py --subreddit cryptocurrency --max-posts 50
+    python scrape_scams_reddit.py
+    python scrape_scams_reddit.py --subreddit cryptocurrency --max-posts 50
 """
 
 import argparse
@@ -19,7 +19,8 @@ import json
 import os
 import time
 import random
-from datetime import datetime
+from datetime import datetime, timezone
+import requests
 import undetected_chromedriver as uc
 from selenium_stealth import stealth
 
@@ -37,7 +38,7 @@ from selenium.common.exceptions import (
 # Use old.reddit.com — its HTML structure is simpler and more stable for
 # scraping than the new React-based UI.
 BASE_URL = "https://old.reddit.com"
-DEFAULT_SUBREDDIT = "CryptoScams"
+DEFAULT_SUBREDDIT = "Scams"
 
 # How many seconds to wait for elements to appear before giving up.
 WAIT_TIMEOUT = 10
@@ -52,6 +53,10 @@ POLITE_DELAY = 1
 COOLDOWN_BASE = 30      # initial cooldown in seconds
 COOLDOWN_MAX = 300      # maximum cooldown (5 minutes)
 MAX_RETRIES = 50          # give up after this many consecutive 429s
+
+# Arctic Shift API (replaces dead CloudSearch for historical post listing).
+ARCTIC_SHIFT_API = "https://arctic-shift.photon-reddit.com/api/posts/search"
+ARCTIC_SHIFT_LIMIT = 100  # max results per request the API supports
 
 
 # ---------------------------------------------------------------------------
@@ -74,7 +79,7 @@ def create_driver() -> uc.Chrome:
     options.add_argument('--incognito')
     options.add_argument('--headless=new')  # Use new headless mode for better compatibility
 
-    driver = uc.Chrome(headless=True, use_subprocess=True, options=options)
+    driver = uc.Chrome(headless=True, use_subprocess=True, options=options, version_main=145)
     stealth(driver,
             languages=["en-US", "en"],
             vendor="Google Inc.",
@@ -206,7 +211,110 @@ def scrape_post_urls(driver: uc.Chrome, subreddit: str,
 
 
 # ---------------------------------------------------------------------------
+# Date-range chunked listing scraper  (uses Arctic Shift API)
+# ---------------------------------------------------------------------------
+
+def _fetch_arctic_shift_page(
+    session: requests.Session,
+    subreddit: str,
+    after_ts: int,
+    before_ts: int,
+) -> list[dict]:
+    """
+    Fetch one page of posts from the Arctic Shift public API.
+
+    Arctic Shift is a third-party Reddit archive with no authentication
+    requirement and proper timestamp filtering — unlike Reddit's own
+    CloudSearch which was removed in 2023.
+
+    Returns a list of raw post dicts from the API response.
+    Raises requests.HTTPError on non-2xx responses.
+    """
+    params = {
+        "subreddit": subreddit,
+        "after": str(after_ts),
+        "before": str(before_ts),
+        "limit": str(ARCTIC_SHIFT_LIMIT),
+        "sort": "desc",  # sort direction by created_utc (newest first)
+    }
+    resp = session.get(ARCTIC_SHIFT_API, params=params, timeout=30)
+    resp.raise_for_status()
+    return resp.json().get("data", [])
+
+
+def scrape_post_urls_chunked(
+    subreddit: str,
+    start_ts: int,
+    end_ts: int,
+    max_posts: int = 100_000,
+) -> list[str]:
+    """
+    Collect post URLs for *subreddit* between *start_ts* and *end_ts* using
+    the Arctic Shift API with cursor-based pagination.
+
+    We walk backwards in time from *end_ts* to *start_ts*, using the oldest
+    ``created_utc`` in each page as the ``before`` cursor for the next
+    request.  This avoids Reddit's 1,000-post listing cap entirely because
+    Arctic Shift is a separate archive with no such restriction.
+
+    Parameters
+    ----------
+    subreddit : str
+        Subreddit name (without r/).
+    start_ts, end_ts : int
+        Unix timestamps (seconds) defining the date range.
+    max_posts : int
+        Stop early once this many unique URLs have been collected.
+
+    Returns
+    -------
+    list[str]
+        Deduplicated list of full old.reddit.com post URLs.
+    """
+    collected: list[str] = []
+    seen: set[str] = set()
+    session = requests.Session()
+    session.headers["User-Agent"] = "hon-fellowship-scraper/1.0"
+
+    before_ts = end_ts
+
+    while len(collected) < max_posts:
+        print(f"  [arctic] Fetching r/{subreddit} | before={before_ts} after={start_ts} …")
+        posts = _fetch_arctic_shift_page(session, subreddit, start_ts, before_ts)
+
+        if not posts:
+            break  # no more results in this range
+
+        for post in posts:
+            permalink = post.get("permalink", "")
+            if permalink:
+                url = f"https://old.reddit.com{permalink}"
+                if url not in seen:
+                    seen.add(url)
+                    collected.append(url)
+
+        # Advance cursor: next page must be strictly older than this page's oldest post.
+        oldest_ts = min(int(p["created_utc"]) for p in posts)
+        if oldest_ts <= start_ts:
+            print("  [arctic] Reached the start of the requested date range. Breaking out of loop.")
+            break  # reached the start of the requested range
+        before_ts = oldest_ts  # Arctic Shift's `before` is exclusive
+
+        # Fewer results than limit means we've exhausted this range.
+        if len(posts) < ARCTIC_SHIFT_LIMIT:
+            print("  [arctic] Fetched fewer posts than the API limit, likely reached the end of available data.")
+            break
+
+        sleep_random()
+
+    print(f"[arctic] Collected {len(collected)} unique post URLs.")
+    return collected[:max_posts]
+
+
+# ---------------------------------------------------------------------------
 # Comment parser  (recursive, handles arbitrary nesting)
+#
+# WARNING: Currently does not collect nested replies.
 # ---------------------------------------------------------------------------
 
 def parse_comment(comment_div, depth: int = 0) -> dict | None:
@@ -249,7 +357,7 @@ def parse_comment(comment_div, depth: int = 0) -> dict | None:
     permalink = permalink_tag["href"] if permalink_tag else ""
 
     # Skip completely empty / deleted comments with no replies
-    if not body and author == "[deleted]":
+    if not body and "Removed" in author or "Deleted" in author:
         # Still parse children — sometimes a deleted parent has live replies
         pass
 
@@ -258,15 +366,19 @@ def parse_comment(comment_div, depth: int = 0) -> dict | None:
     # contains its own list of <div class="comment"> elements.
     replies: list[dict] = []
     child_area = comment_div.select_one("div.child")
+    # print("child area: ", child_area)
     if child_area:
+        print("child area found, looking for child comments …")
         # Direct children only (recursive=False) to avoid double-counting
         # deeper levels — each level calls parse_comment on its own children.
-        for child_comment in child_area.find_all(
-            "div", class_="comment", recursive=False
-        ):
-            parsed = parse_comment(child_comment, depth=depth + 1)
-            if parsed:
-                replies.append(parsed)
+        child_comments = child_area.select(":scope > div.sitetable > div.comment")
+        if child_comments:
+            print("Found child_comments")
+            for child_comment in child_comments:
+                print("parsing child comment at depth", depth + 1)
+                parsed = parse_comment(child_comment, depth=depth + 1)
+                if parsed:
+                    replies.append(parsed)
 
     return {
         "author": author,
@@ -306,7 +418,7 @@ def expand_hidden_comments(driver: uc.Chrome) -> None:
                 try:
                     driver.execute_script("arguments[0].click();", link)
                     clicked_any = True
-                    sleep_random()
+                    # sleep_random()    # Remove small delay to speed up loading all comments
                 except (StaleElementReferenceException,
                         ElementClickInterceptedException):
                     # Element may have been replaced by newly loaded HTML.
@@ -448,9 +560,13 @@ def main():
         help="Name of the subreddit to scrape (default: %(default)s).",
     )
     parser.add_argument(
+        "--post", "-p",
+        help="Scrape a single post by URL (overrides --subreddit and --max-posts).",
+    )
+    parser.add_argument(
         "--max-posts", "-n",
         type=int,
-        default=10000,
+        default=100_000,
         help="Maximum number of posts to scrape (default: %(default)s).",
     )
     parser.add_argument(
@@ -463,6 +579,21 @@ def main():
         action="store_true",
         help="Also export a flat CSV of all comments.",
     )
+    parser.add_argument(
+        "--chunked",
+        action="store_true",
+        help="Use date-range chunking to bypass Reddit's 1,000-post listing cap.",
+    )
+    parser.add_argument(
+        "--start-date",
+        default="2010-01-01",
+        help="Earliest post date for chunked mode, YYYY-MM-DD (default: %(default)s).",
+    )
+    parser.add_argument(
+        "--end-date",
+        default=None,
+        help="Latest post date for chunked mode, YYYY-MM-DD (default: today).",
+    )
     args = parser.parse_args()
 
     # --- Ensure output directory exists ------------------------------------
@@ -472,10 +603,44 @@ def main():
     print("[init] Starting headless Chrome …")
     driver = create_driver()
 
+    # Helper to save the collected posts to a JSON file with a timestamped name.
+    def save_json(all_posts: list[dict], post_or_subreddit: str):
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            json_path = os.path.join(
+                args.output_dir,
+                f"../data/reddit_r{post_or_subreddit}_{timestamp}.json",
+            )
+            with open(json_path, "w", encoding="utf-8") as f:
+                json.dump(all_posts, f, indent=2, ensure_ascii=False)
+            print(f"[done] Saved {len(all_posts)} posts → {json_path}")
+
     try:
+        # For posts only
+        if args.post:
+            print(f"[init] Single post mode: {args.post}")
+            post_data = scrape_post(driver, args.post)
+            all_posts = [post_data]
+            save_json(all_posts, post_or_subreddit=args.post.split("/")[-1])
+
+            return  # Skip the rest of the flow since we're only doing one post
         # --- Step 1: collect post URLs from the subreddit listing ----------
-        print("scrape_post_urls called")
-        post_urls = scrape_post_urls(driver, args.subreddit, args.max_posts)
+        if args.chunked:
+            start_dt = datetime.strptime(args.start_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            end_dt = (
+                datetime.strptime(args.end_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                if args.end_date
+                else datetime.now(timezone.utc)
+            )
+            start_ts = int(start_dt.timestamp())
+            end_ts = int(end_dt.timestamp())
+            print(f"[init] Chunked mode: {args.start_date} → {args.end_date or 'today'} "
+                  f"({start_ts} → {end_ts})")
+            post_urls = scrape_post_urls_chunked(
+                args.subreddit, start_ts, end_ts, args.max_posts
+            )
+        else:
+            print("scrape_post_urls called")
+            post_urls = scrape_post_urls(driver, args.subreddit, args.max_posts)
 
         # --- Step 2: scrape each post and its comments ---------------------
         all_posts: list[dict] = []
@@ -485,19 +650,12 @@ def main():
             all_posts.append(post_data)
 
         # --- Step 3: write results to JSON ---------------------------------
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        json_path = os.path.join(
-            args.output_dir,
-            f"../data/reddit_r{args.subreddit}_{timestamp}.json",
-        )
-        with open(json_path, "w", encoding="utf-8") as f:
-            json.dump(all_posts, f, indent=2, ensure_ascii=False)
-        print(f"[done] Saved {len(all_posts)} posts → {json_path}")
+        save_json(all_posts, post_or_subreddit=args.subreddit)
 
         # --- Step 4 (optional): write flat CSV -----------------------------
         if args.csv:
             import csv
-
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             csv_path = os.path.join(
                 args.output_dir,
                 f"../data/reddit_r{args.subreddit}_comments_{timestamp}.csv",

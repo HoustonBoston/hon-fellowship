@@ -34,11 +34,11 @@ def scrape_dfpi_data(url):
 
         except Exception:
             # Still save debug page and exit gracefully
-            with open("../debug/page_debug.html", "w") as f:
+            with open("./debug/page_debug.html", "w") as f:
                 soup_debug = BeautifulSoup(driver.page_source, 'html.parser')
                 f.write(soup_debug.prettify())
             
-            print("Timed out waiting for data. Saved page source to ../debug/page_debug.html for inspection")
+            print("Timed out waiting for data. Saved page source to ./debug/page_debug.html for inspection")
             return []
 
         # Select dropdown to show 100 entries 
@@ -59,21 +59,21 @@ def scrape_dfpi_data(url):
                 website = soup.select('td.column-4')
 
                 # # Save page source for debugging
-                # with open("../debug/page_debug.html", "w") as f:
+                # with open("./debug/page_debug.html", "w") as f:
                 #     f.write(soup.prettify())
-                # print("Saved page source to ../debug/page_debug.html for inspection")
+                # print("Saved page source to ./debug/page_debug.html for inspection")
                 
                 if not primary_subject:
-                    print("No td.column-1 elements found. Check ../debug/page_debug.html for page structure.")
+                    print("No td.column-1 elements found. Check ./debug/page_debug.html for page structure.")
                     return []
                 if not complaint_narrative:
-                    print("No td.column-2 elements found. Check ../debug/page_debug.html for page structure.")
+                    print("No td.column-2 elements found. Check ./debug/page_debug.html for page structure.")
                     return []
                 if not scam_type:
-                    print("No td.column-3 elements found. Check ../debug/page_debug.html for page structure.")
+                    print("No td.column-3 elements found. Check ./debug/page_debug.html for page structure.")
                     return []
                 if not website:
-                    print("No td.column-4 elements found. Check ../debug/page_debug.html for page structure.")
+                    print("No td.column-4 elements found. Check ./debug/page_debug.html for page structure.")
                     return []
 
                 for subject, complaint_narrative, scam, site in zip(primary_subject, complaint_narrative, scam_type, website):
@@ -106,15 +106,15 @@ def scrape_dfpi_data(url):
 # Function to write data to CSV 
 def write_to_csv(data):
     from pathlib import Path
-    Path("../data").mkdir(parents=True, exist_ok=True)
+    Path("./data").mkdir(parents=True, exist_ok=True)
     keys = data[0].keys()
 
-    with open('../data/dfpi_crypto_scam_data.csv', 'w', newline='', encoding='utf-8') as output_file:
+    with open('./data/dfpi_crypto_scam_data.csv', 'w', newline='', encoding='utf-8') as output_file:
         dict_writer = csv.DictWriter(output_file, fieldnames=keys)
         dict_writer.writeheader()
         dict_writer.writerows(data)
         
-    print("Data written to ../data/dfpi_crypto_scam_data.csv")
+    print("Data written to ./data/dfpi_crypto_scam_data.csv")
 
 if __name__ == '__main__':
     data = scrape_dfpi_data(URL)
