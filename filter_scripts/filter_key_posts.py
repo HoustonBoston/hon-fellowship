@@ -6,10 +6,10 @@ import argparse
 
 parser = argparse.ArgumentParser(description="Filter Reddit posts for specific keywords.")
 parser.add_argument("--keywords", "-k", nargs="+", default=["romance scam", "pig butchering"], help="Keywords to filter posts by")
-parser.add_argument("--input", "-i", help="Input file path", required=True)
+parser.add_argument("--file", "-f", help="Input file path", required=True)
 args = parser.parse_args()
 
-path = Path(args.input)
+path = Path(args.file)
 
 # Filter for keywords ("romance scam", "pig butchering")
 keywords = set(args.keywords)
