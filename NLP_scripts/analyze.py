@@ -9,7 +9,7 @@ def ask_ollama(question: str, model: str = "llama3:8b") -> str:
                                     "content": question
                                 }])
         # return the assistant message content when available
-        return response['Message']['Content']
+        return response['message']['content']
     except Exception as e:
         print(f"An error occurred: {e}")
         return "Sorry, I couldn't process your request."
