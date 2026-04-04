@@ -1,6 +1,6 @@
 import ollama
 
-def ask_ollama(question: str, model: str = "qwen3.5:35b") -> str:
+def ask_ollama(question: str, model: str = "llama3:8b") -> str:
     try:
         response = ollama.chat(model=model, 
                             messages=[
