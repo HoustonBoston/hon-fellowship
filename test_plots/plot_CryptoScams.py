@@ -4,9 +4,13 @@ Test the plotting of crypto scams data.
 
 import matplotlib.pyplot as plt
 import pandas as pd
+from pathlib import Path
+
+CDIR = Path(__file__).resolve().parent
+print(CDIR)
 
 # Convert to DataFrame
-df = pd.read_json("C:\\Users\\myhor\\projects\\hon-fellowship\\CryptoScams\\data\\filtered_r_CryptoScams_2020-2025_posts.jsonl", lines=True)
+df = pd.read_json(CDIR.parent / "CryptoScams" / "data" / "filtered_r_CryptoScams_2020-2025_posts.jsonl", lines=True)
 
 def plot_yearx_county(df):
     df["year"] = pd.to_datetime(df["date"], errors="coerce").dt.year  # Convert date to year, handle errors
