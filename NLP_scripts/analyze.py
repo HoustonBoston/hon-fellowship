@@ -1,4 +1,14 @@
 import ollama
+import argparse
+import json
+from pathlib import Path
+
+
+# Using yield to read file line by line and parse JSON effiently.
+def extract_json_line(file_path):
+    with open(file_path, "r", encoding="utf-8") as f:
+        for line in f:
+            yield json.loads(line)
 
 def ask_ollama(question: str, model: str = "llama3:8b") -> str:
     try:
@@ -15,4 +25,16 @@ def ask_ollama(question: str, model: str = "llama3:8b") -> str:
         return "Sorry, I couldn't process your request."
 
 if __name__ == "__main__":
-    print(ask_ollama("What is today's date in MM/DD/YYYY format?"))
+    """Takes args from command line and passes them to the ask_ollama function."""
+    parser = argparse.ArgumentParser(description="Custom params for ask_ollama function.")
+    parser.add_argument("--question", "-q", type=str, required=True, help="The question to ask Ollama.")
+    parser.add_argument("--model", type=str, default="llama3:8b", help="The Ollama model to use (default: llama3:8b).")
+    parser.add_argument("--file", "-f", type=str, help="Path to a file containing some data", required=True)
+    args = parser.parse_args()
+
+    path = Path(args.file if args.file else "")
+
+    for post_or_comment in extract_json_line(path):
+        question = f"{args.question}\n\nData: {post_or_comment}"
+        answer = ask_ollama(question, model=args.model)
+        print(f"Question: {question}\nAnswer: {answer}\n{'-'*50}\n")
