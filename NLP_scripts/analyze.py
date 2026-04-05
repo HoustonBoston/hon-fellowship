@@ -4,11 +4,11 @@ import json
 from pathlib import Path
 
 
-# Using yield to read file line by line and parse JSON effiently.
+# Using yield to read file line by line and parse JSON efficiently.
 def extract_json_line(file_path):
     with open(file_path, "r", encoding="utf-8") as f:
         for line in f:
-            yield json.loads(line)['body']
+            yield json.loads(line)
 
 def ask_ollama(question: str, model: str = "llama3:8b") -> str:
     try:
@@ -35,6 +35,7 @@ if __name__ == "__main__":
     path = Path(args.file)
 
     for post_or_comment in extract_json_line(path):
-        question = f"{args.question}\n\nData: {post_or_comment}"
+        # stringify the JSON object for context
+        question = f"{args.question}\n\nData: {json.dumps(post_or_comment, ensure_ascii=False)}"
         answer = ask_ollama(question, model=args.model)
         print(f"Question: {question}\nAnswer: {answer}\n{'-'*50}\n")
