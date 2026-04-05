@@ -41,3 +41,5 @@ if __name__ == "__main__":
         # get rid of period at the end
         answer = answer.rstrip(".")
         print(f"Question: {question}\nAnswer: {answer}\n{'-'*50}\n")
+
+        break
