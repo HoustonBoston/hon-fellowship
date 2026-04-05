@@ -8,7 +8,7 @@ from pathlib import Path
 def extract_json_line(file_path):
     with open(file_path, "r", encoding="utf-8") as f:
         for line in f:
-            yield json.load(line)
+            yield json.loads(line)
 
 def ask_ollama(question: str, model: str = "llama3:8b") -> str:
     try:
@@ -39,7 +39,7 @@ if __name__ == "__main__":
 
     for post_or_comment in extract_json_line(path):
         # stringify the JSON object for context
-        question = f"{args.question}\n\nData: {json.dumps(post_or_comment['body'], ensure_ascii=False)}"
+        question = f"{args.question}\n\nData: {post_or_comment['body']}"
         answer = ask_ollama(question, model=args.model)
         # get rid of period at the end
         answer = answer.rstrip(".")
