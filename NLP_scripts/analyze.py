@@ -42,6 +42,6 @@ if __name__ == "__main__":
         question = f"{args.question}\n\nData: {post_or_comment['selftext']}, {post_or_comment['title']}"
         answer = ask_ollama(question, model=args.model)
         # get rid of period at the end
-        answer = answer.rstrip(".")
+        answer = answer.rstrip(".").rstrip("*").lstrip("*")
         print(f"Question: {question}\nAnswer: {answer}\n{'-'*50}\n")
 
