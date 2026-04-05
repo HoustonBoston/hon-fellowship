@@ -39,7 +39,7 @@ if __name__ == "__main__":
 
     for post_or_comment in extract_json_line(path):
         # stringify the JSON object for context
-        question = f"{args.question}\n\nData: {post_or_comment['body']}"
+        question = f"{args.question}\n\nData: {post_or_comment['selftext']}, {post_or_comment['title']}"
         answer = ask_ollama(question, model=args.model)
         # get rid of period at the end
         answer = answer.rstrip(".")
