@@ -32,7 +32,7 @@ if __name__ == "__main__":
     parser.add_argument("--file", "-f", type=str, help="Path to a file containing some data", required=True)
     args = parser.parse_args()
 
-    path = Path(args.file if args.file else "")
+    path = Path(args.file)
 
     for post_or_comment in extract_json_line(path):
         question = f"{args.question}\n\nData: {post_or_comment}"
