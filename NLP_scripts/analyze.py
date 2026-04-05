@@ -45,5 +45,4 @@ if __name__ == "__main__":
             # get rid of special chars at the end
             answer = answer.rstrip(".").rstrip("*").lstrip("*")
             post_or_comment['technique'] = answer
-            json.dump(post_or_comment, f)
-            f.write("\n")  # Add a newline after each JSON object for readability
+            f.write(json.dumps(post_or_comment, ensure_ascii=False) + "\n")
