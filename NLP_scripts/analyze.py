@@ -17,7 +17,10 @@ def ask_ollama(question: str, model: str = "llama3:8b") -> str:
                                 {
                                     "role": "user", 
                                     "content": question
-                                }])
+                                }],
+                                options={
+                                    "temperature": 0.4
+                                })
         # return the assistant message content when available
         return response['message']['content']
     except Exception as e:
