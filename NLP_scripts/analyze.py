@@ -37,11 +37,13 @@ if __name__ == "__main__":
 
     path = Path(args.file)
 
-    for post_or_comment in extract_json_line(path):
-        # stringify the JSON object for context
-        question = f"{args.question}\n\nData: {post_or_comment['selftext']}, {post_or_comment['title']}"
-        answer = ask_ollama(question, model=args.model)
-        # get rid of period at the end
-        answer = answer.rstrip(".").rstrip("*").lstrip("*")
-        print(f"Question: {question}\nAnswer: {answer}\n{'-'*50}\n")
-
+    with open(path.resolve().stem + "_with_technique.jsonl", "w", encoding="utf-8") as f:
+        for post_or_comment in extract_json_line(path):
+            # stringify the JSON object for context
+            question = f"{args.question}\n\nData: {post_or_comment['selftext']}, {post_or_comment['title']}"
+            answer = ask_ollama(question, model=args.model)
+            # get rid of special chars at the end
+            answer = answer.rstrip(".").rstrip("*").lstrip("*")
+            post_or_comment['technique'] = answer
+            json.dump(post_or_comment, f)
+            f.write("\n")  # Add a newline after each JSON object for readability
