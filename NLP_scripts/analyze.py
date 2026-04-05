@@ -40,7 +40,7 @@ if __name__ == "__main__":
     with open(str(path.resolve().with_suffix("")) + "_with_technique.jsonl", "w", encoding="utf-8") as f:
         for post_or_comment in extract_json_line(path):
             # stringify the JSON object for context
-            question = f"{args.question}\n\nData: {post_or_comment['selftext']}, {post_or_comment['title']}"
+            question = f"{args.question}\n\nData: Title: {post_or_comment['title']}, Text: {post_or_comment['selftext']}"
             answer = ask_ollama(question, model=args.model)
             # get rid of special chars at the end
             answer = answer.rstrip(".").rstrip("*").lstrip("*")
