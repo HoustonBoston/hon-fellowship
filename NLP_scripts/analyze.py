@@ -37,7 +37,7 @@ if __name__ == "__main__":
 
     path = Path(args.file)
 
-    with open(path.resolve().stem + "_with_technique.jsonl", "w", encoding="utf-8") as f:
+    with open(path.resolve().with_suffix("") + "_with_technique.jsonl", "w", encoding="utf-8") as f:
         for post_or_comment in extract_json_line(path):
             # stringify the JSON object for context
             question = f"{args.question}\n\nData: {post_or_comment['selftext']}, {post_or_comment['title']}"
