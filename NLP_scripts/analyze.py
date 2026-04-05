@@ -8,7 +8,7 @@ from pathlib import Path
 def extract_json_line(file_path):
     with open(file_path, "r", encoding="utf-8") as f:
         for line in f:
-            yield json.loads(line)
+            yield json.load(line)
 
 def ask_ollama(question: str, model: str = "llama3:8b") -> str:
     try:
