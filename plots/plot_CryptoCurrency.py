@@ -1,5 +1,5 @@
 """
-Test the plotting of crypto scams data.
+Test the plotting of crypto currency data.
 """
 
 import matplotlib.pyplot as plt
@@ -12,7 +12,7 @@ print(CDIR)
 # Convert to DataFrame
 df = pd.read_json(CDIR.parent / "CryptoCurrency" / "data" / "filtered_r_CryptoCurrency_2020-2025_posts_with_technique.jsonl", lines=True)
 
-def plot_yearx_county(df):
+def plot_techniquex_county(df):
     df["year"] = pd.to_datetime(df["date"], errors="coerce").dt.year  # Convert date to year, handle errors
     df = df.dropna(subset=["year"])  # Drop rows where date conversion failed
 
@@ -31,4 +31,4 @@ def plot_yearx_county(df):
     plt.show()
 
 if __name__ == "__main__":
-    plot_yearx_county(df)
+    plot_techniquex_county(df)
