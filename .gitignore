@@ -5,3 +5,4 @@
 scrapers/data/*
 */.env
 **/*.json*
+**/*pycache*

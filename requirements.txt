@@ -8,3 +8,4 @@ selenium-stealth
 setuptools
 requests
 ollama
+nltk
