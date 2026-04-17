@@ -26,6 +26,23 @@ def ask_ollama(question: str, model: str = "llama3:8b") -> str:
     except Exception as e:
         print(f"An error occurred: {e}")
         return "Sorry, I couldn't process your request."
+    
+def extract_technique_and_total_dollar_lost(path, args):
+    with open(str(path.resolve().with_suffix("")) + "_with_technique.jsonl", "w", encoding="utf-8") as f:
+        for post_or_comment in extract_json_line(path):
+            # stringify the JSON object for context
+            question = f"{args.question}\n\nData: Title: {post_or_comment['title']}, Text: {post_or_comment['selftext']}"
+            answer = ask_ollama(question, model=args.model)
+            # get rid of special chars at the end
+            answer = answer.rstrip(".").rstrip("*").lstrip("*")
+            post_or_comment['technique'] = answer
+            q = "What is the total money lost from the victim? Just the number, no commas or dollar sign"
+            question = f"{q}\n\nData: Title: {post_or_comment['title']}, Text: {post_or_comment['selftext']}"
+            answer = ask_ollama(question, args.model)
+            answer = answer.rstrip(".").rstrip("*").lstrip("*")
+            post_or_comment['total_loss'] = answer
+            f.write(json.dumps(post_or_comment, ensure_ascii=False) + "\n")
+
 
 if __name__ == "__main__":
     """Takes args from command line and passes them to the ask_ollama function."""
@@ -36,13 +53,5 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     path = Path(args.file)
-
-    with open(str(path.resolve().with_suffix("")) + "_with_technique.jsonl", "w", encoding="utf-8") as f:
-        for post_or_comment in extract_json_line(path):
-            # stringify the JSON object for context
-            question = f"{args.question}\n\nData: Title: {post_or_comment['title']}, Text: {post_or_comment['selftext']}"
-            answer = ask_ollama(question, model=args.model)
-            # get rid of special chars at the end
-            answer = answer.rstrip(".").rstrip("*").lstrip("*")
-            post_or_comment['technique'] = answer
-            f.write(json.dumps(post_or_comment, ensure_ascii=False) + "\n")
+    extract_technique_and_total_dollar_lost(path, args=args)
+            
