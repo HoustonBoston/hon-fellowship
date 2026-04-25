@@ -41,7 +41,7 @@ if __name__ == "__main__":
 
     default_question = "What are the tactics used within this scam? List of terms: grooming, impersonation, investment, romance, " \
     "social engineering. Respond with only one term from the given list. If multiple, still choose the best fitting term. " \
-    "Again, only respond with one term from the list."
+    "Again, only respond with one term from the list, don't need to give a reason, just the term."
 
     parser = argparse.ArgumentParser(description="Custom params for ask_ollama function.")
     parser.add_argument("--question", "-q", type=str, required=False, help="The question to ask Ollama.",
