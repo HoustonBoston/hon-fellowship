@@ -12,7 +12,7 @@ import os
 ########################
 
 DEFAULT_QUESTION = "Classify the scenario into exactly one category that best fits from this list: " \
-                     "[impersonation, investment, romance, grooming, social engineering] " \
+                     "['impersonation', 'investment scam', 'romance', 'grooming', 'social engineering'] " \
                      "Output only the category name. Do not include punctuation or explanations. " \
                      "Category: "
 
@@ -69,6 +69,6 @@ if __name__ == "__main__":
             question = f"Scenario: title: {post_or_comment['title']}, text: {post_or_comment['selftext']}\n\n{args.question}"
             answer = ask_ollama(question, model=args.model)
             # get rid of special chars at the end
-            answer = answer.strip().rstrip(".").rstrip("*").lstrip("*").lower()
+            answer = answer.strip().rstrip(".").rstrip("*").lstrip("*").lower().strip('"').strip("'")
             post_or_comment['technique'] = answer
             f.write(json.dumps(post_or_comment, ensure_ascii=False) + "\n")
