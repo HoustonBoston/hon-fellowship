@@ -32,8 +32,8 @@ def ask_ollama(question: str, model: str = "llama3:8b") -> str:
                                     "content": question
                                 }],
                                 options={
-                                    "temperature": 0.0,  # Deterministic output
-                                    "num_predict": 5,    # Limit response length
+                                    "temperature": 0.3,  # Deterministic output
+                                    "num_predict": 10,    # Limit response length
                                     "stop": ["\n", "Explanation", "Scenario", "."]       # Stop at newline to get concise answers
                                 })
         # return the assistant message content when available
