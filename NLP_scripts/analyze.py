@@ -56,6 +56,7 @@ if __name__ == "__main__":
     path = Path(args.file)
     print(f"Processing file: {path}")
     print(f"question: {args.question}")
+    print(f"model: {args.model}")
 
     with open(str(path.resolve().with_suffix("")) + "_with_technique.jsonl", "w", encoding="utf-8") as f:
         for post_or_comment in extract_json_line(path):
