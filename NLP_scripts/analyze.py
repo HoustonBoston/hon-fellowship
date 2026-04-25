@@ -11,6 +11,11 @@ import os
 #
 ########################
 
+DEFAULT_QUESTION = "Classify the scenario into exactly one category from this list: " \
+                     "[impersonation, investment, romance, grooming, social engineering] " \
+                     "Output only the category name. Do not include punctuation or explanations. " \
+                     "Category: "
+
 
 # Using yield to read file line by line and parse JSON efficiently.
 def extract_json_line(file_path):
@@ -29,7 +34,7 @@ def ask_ollama(question: str, model: str = "llama3:8b") -> str:
                                 options={
                                     "temperature": 0.0,  # Deterministic output
                                     "num_predict": 5,    # Limit response length
-                                    "stop": ["\n", "Explanation", "Scenario"]       # Stop at newline to get concise answers
+                                    "stop": ["\n", "Explanation", "Scenario", "."]       # Stop at newline to get concise answers
                                 })
         # return the assistant message content when available
         return response['message']['content']
@@ -40,9 +45,6 @@ def ask_ollama(question: str, model: str = "llama3:8b") -> str:
 if __name__ == "__main__":
 
     """Takes args from command line and passes them to the ask_ollama function."""
-
-    default_question = "Based on the list (grooming, impersonation, investment, romance, social engineering), " \
-    "what is the single best term to describe this scenario? Term:"
 
     parser = argparse.ArgumentParser(description="Custom params for ask_ollama function.")
     parser.add_argument("--question", "-q", type=str, required=False, help="The question to ask Ollama.",
