@@ -42,7 +42,7 @@ if __name__ == "__main__":
     """Takes args from command line and passes them to the ask_ollama function."""
 
     default_question = "Based on the list (grooming, impersonation, investment, romance, social engineering), " \
-    "what is the single best term to describe this scenario?"
+    "what is the single best term to describe this scenario? Term:"
 
     parser = argparse.ArgumentParser(description="Custom params for ask_ollama function.")
     parser.add_argument("--question", "-q", type=str, required=False, help="The question to ask Ollama.",
