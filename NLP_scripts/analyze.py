@@ -11,9 +11,9 @@ import os
 #
 ########################
 
-DEFAULT_QUESTION = "Classify the scenario into exactly ONE category that best fits from this list: " \
+DEFAULT_QUESTION = "Classify the scenario into EACTLY ONE category that best fits from THIS list: " \
                      "['impersonation', 'investment manipulation', 'romance', 'grooming', 'social engineering'] " \
-                     "Please output only the category name. Do NOT include punctuation or explanations. " \
+                     "Please output only the category name. DO NOT include punctuation or explanations. " \
                      "Category: "
 
 
