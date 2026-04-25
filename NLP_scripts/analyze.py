@@ -36,13 +36,16 @@ def ask_ollama(question: str, model: str = "llama3:8b") -> str:
         os.exit(1)
 
 if __name__ == "__main__":
+
     """Takes args from command line and passes them to the ask_ollama function."""
+
+    default_question = "What are the tactics used within this scam? List of terms: grooming, impersonation, investment, romance, " \
+    "social engineering. Respond with only one term from the given list. If multiple, still choose the best fitting term. " \
+    "Again, only respond with one term from the list."
+
     parser = argparse.ArgumentParser(description="Custom params for ask_ollama function.")
     parser.add_argument("--question", "-q", type=str, required=False, help="The question to ask Ollama.",
-                        default="""What are the tactics used within this scam? List of terms:
-                         grooming, impersonation, 
-               investment, romance, social engineering)? Respond with only one term from the given list. If multiple,
-               still choose the best fitting term. Again, only respond with one term from the list.""")
+                        default=default_question)
     parser.add_argument("--model", "-m", type=str, default="llama3:8b", help="The Ollama model to use (default: llama3:8b).")
     parser.add_argument("--file", "-f", type=str, help="Path to a file containing some data", required=True)
     args = parser.parse_args()
