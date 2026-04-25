@@ -71,4 +71,5 @@ if __name__ == "__main__":
             # get rid of special chars at the end
             answer = answer.strip().rstrip(".").rstrip("*").lstrip("*").lower().strip('"').strip("'")
             post_or_comment['technique'] = answer
+            print(f"scam technique: {post_or_comment['technique']}")
             f.write(json.dumps(post_or_comment, ensure_ascii=False) + "\n")
