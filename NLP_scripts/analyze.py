@@ -3,6 +3,8 @@ import argparse
 import json
 from pathlib import Path
 import os
+import re
+import sys
 
 ########################
 #
@@ -11,10 +13,74 @@ import os
 #
 ########################
 
-DEFAULT_QUESTION = "Classify the scenario into EACTLY ONE category that best fits from THIS list: " \
-                     "['impersonation', 'investment manipulation', 'romance', 'grooming', 'social engineering'] " \
-                     "Please output only the category name. DO NOT include punctuation or explanations. " \
-                     "Category: "
+ALLOWED_LABELS = [
+    "impersonation",
+    "investment manipulation",
+    "romance",
+    "grooming",
+    "social engineering",
+]
+
+DEFAULT_QUESTION = (
+    "Classify the scenario into EXACTLY ONE category from this list: "
+    "['impersonation', 'investment manipulation', 'romance', 'grooming', 'social engineering'].\n"
+    "Use these definitions:\n"
+    "- impersonation: scammer pretends to be a specific person, institution, authority, or support agent.\n"
+    "- investment manipulation: fake/rigged investment or trading opportunity, fake returns, fake platform.\n"
+    "- romance: emotional/romantic relationship used to build trust before scamming.\n"
+    "- grooming: gradual long-term emotional conditioning and dependency building.\n"
+    "- social engineering: manipulation tactics that do not fit the above categories.\n\n"
+    "Tie-break rules:\n"
+    "1) If explicit pretending/fake identity/posing as a known person or organization appears, choose impersonation.\n"
+    "2) Else if relationship/dating romance is central, choose romance.\n"
+    "3) Else if fake investment/trading is central, choose investment manipulation.\n"
+    "4) Else choose the best remaining category.\n\n"
+    "Output only one category name, exactly as written in the list. No punctuation, no explanation.\n"
+    "Category: "
+)
+
+NORMALIZATION_MAP = {
+    "impersonation": "impersonation",
+    "imposter": "impersonation",
+    "imposter scam": "impersonation",
+    "identity theft": "impersonation",
+    "investment": "investment manipulation",
+    "investment scam": "investment manipulation",
+    "pig butchering": "investment manipulation",
+    "pig-butchering": "investment manipulation",
+    "romance": "romance",
+    "romance scam": "romance",
+    "dating scam": "romance",
+    "grooming": "grooming",
+    "social engineering": "social engineering",
+}
+
+
+def normalize_label(raw_answer: str, scenario: str) -> str:
+    cleaned = raw_answer.strip().lower()
+    cleaned = cleaned.strip('"\'`*_.,:;![](){} ')
+    cleaned = re.sub(r"\s+", " ", cleaned)
+
+    if cleaned in NORMALIZATION_MAP:
+        return NORMALIZATION_MAP[cleaned]
+
+    for label in ALLOWED_LABELS:
+        if label in cleaned:
+            return label
+
+    scenario_lc = scenario.lower()
+    if re.search(
+        r"\b(pretend|pretending|impersonat|posing as|fake support|customer service|"
+        r"coinbase support|binance support|irs|fbi|police|bank called|official account)\b",
+        scenario_lc,
+    ):
+        return "impersonation"
+    if re.search(r"\b(romance|dating|boyfriend|girlfriend|tinder|catfish|love interest)\b", scenario_lc):
+        return "romance"
+    if re.search(r"\b(investment|trading|profit|returns|defi|forex|exchange|platform)\b", scenario_lc):
+        return "investment manipulation"
+
+    return "social engineering"
 
 
 # Using yield to read file line by line and parse JSON efficiently.
@@ -45,7 +111,7 @@ def ask_ollama(question: str, model: str = "llama3:8b") -> str:
         return response['message']['content']
     except Exception as e:
         print(f"An error occurred: {e}")
-        os.exit(1)
+        sys.exit(1)
 
 if __name__ == "__main__":
 
@@ -66,10 +132,11 @@ if __name__ == "__main__":
     with open(str(path.resolve().with_suffix("")) + "_with_technique.jsonl", "w", encoding="utf-8") as f:
         for post_or_comment in extract_json_line(path):
             # stringify the JSON object for context
-            question = f"Scenario: title: {post_or_comment['title']}, text: {post_or_comment['selftext']}\n\n{args.question}"
-            answer = ask_ollama(question, model=args.model)
-            # get rid of special chars at the end
-            answer = answer.strip().rstrip(".").rstrip("*").lstrip("*").lower().strip('"').strip("'")
-            post_or_comment['technique'] = answer
+            title = str(post_or_comment.get('title', ''))
+            text = str(post_or_comment.get('selftext', post_or_comment.get('body', '')))
+            scenario = f"title: {title}, text: {text}"
+            question = f"Scenario: {scenario}\n\n{args.question}"
+            raw_answer = ask_ollama(question, model=args.model)
+            post_or_comment['technique'] = normalize_label(raw_answer, scenario)
             print(f"scam technique: {post_or_comment['technique']}")
             f.write(json.dumps(post_or_comment, ensure_ascii=False) + "\n")
