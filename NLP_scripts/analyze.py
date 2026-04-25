@@ -28,12 +28,17 @@ def ask_ollama(question: str, model: str = "llama3:8b") -> str:
         response = ollama.chat(model=model, 
                             messages=[
                                 {
+                                    "role": "system", 
+                                    "content": "You are a classification engine. " \
+                                    "You must output ONLY the category name. No thoughts, no explanations, no tags."
+                                },
+                                {
                                     "role": "user", 
                                     "content": question
                                 }],
                                 options={
                                     "temperature": 0.0,  # Deterministic output
-                                    "num_predict": 100,    # Limit response length
+                                    "num_predict": 10,    # Limit response length
                                     # "stop": ["Scenario"]       # Stop at newline to get concise answers
                                 })
         # return the assistant message content when available
