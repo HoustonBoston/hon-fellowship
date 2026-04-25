@@ -27,7 +27,9 @@ def ask_ollama(question: str, model: str = "llama3:8b") -> str:
                                     "content": question
                                 }],
                                 options={
-                                    "temperature": 0.4
+                                    "temperature": 0.0,  # Deterministic output
+                                    "max_tokens": 10,    # Limit response length
+                                    "stop": ["\n", "Explanation", "Scenario"]       # Stop at newline to get concise answers
                                 })
         # return the assistant message content when available
         return response['message']['content']
@@ -59,6 +61,6 @@ if __name__ == "__main__":
             question = f"Scenario: title: {post_or_comment['title']}, text: {post_or_comment['selftext']}\n\n{args.question}"
             answer = ask_ollama(question, model=args.model)
             # get rid of special chars at the end
-            answer = answer.rstrip(".").rstrip("*").lstrip("*").lower()
+            answer = answer.strip().rstrip(".").rstrip("*").lstrip("*").lower()
             post_or_comment['technique'] = answer
             f.write(json.dumps(post_or_comment, ensure_ascii=False) + "\n")
