@@ -48,7 +48,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Custom params for ask_ollama function.")
     parser.add_argument("--question", "-q", type=str, required=False, help="The question to ask Ollama.",
-                        default=default_question)
+                        default=DEFAULT_QUESTION)
     parser.add_argument("--model", "-m", type=str, default="llama3:8b", help="The Ollama model to use (default: llama3:8b).")
     parser.add_argument("--file", "-f", type=str, help="Path to a file containing some data", required=True)
     args = parser.parse_args()
