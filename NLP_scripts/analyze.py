@@ -39,9 +39,8 @@ if __name__ == "__main__":
 
     """Takes args from command line and passes them to the ask_ollama function."""
 
-    default_question = "What are the tactics used within this scam? List of terms: grooming, impersonation, investment, romance, " \
-    "social engineering. Respond with only one term from the given list. If multiple, still choose the best fitting term. " \
-    "Again, only respond with one term from the list, don't need to give a reason, just the term."
+    default_question = "Based on the list (grooming, impersonation, investment, romance, social engineering), " \
+    "what is the single best term to describe this scenario?"
 
     parser = argparse.ArgumentParser(description="Custom params for ask_ollama function.")
     parser.add_argument("--question", "-q", type=str, required=False, help="The question to ask Ollama.",
@@ -57,9 +56,9 @@ if __name__ == "__main__":
     with open(str(path.resolve().with_suffix("")) + "_with_technique.jsonl", "w", encoding="utf-8") as f:
         for post_or_comment in extract_json_line(path):
             # stringify the JSON object for context
-            question = f"{args.question}\n\nData: Title: {post_or_comment['title']}, Text: {post_or_comment['selftext']}"
+            question = f"Scenario: title: {post_or_comment['title']}, text: {post_or_comment['selftext']}\n\n{args.question}"
             answer = ask_ollama(question, model=args.model)
             # get rid of special chars at the end
-            answer = answer.rstrip(".").rstrip("*").lstrip("*")
+            answer = answer.rstrip(".").rstrip("*").lstrip("*").lower()
             post_or_comment['technique'] = answer
             f.write(json.dumps(post_or_comment, ensure_ascii=False) + "\n")
