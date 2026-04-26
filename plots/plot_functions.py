@@ -9,14 +9,17 @@ def techniquex_county(df: pd.DataFrame, title: str):
 
     # Print the first few rows to verify the data
     print(df.head())
-
+    
     # Plot configs
-    df.plot(x="technique", y="technique", kind="bar", title=title)
+    ax = df.plot(x="technique", y="technique", kind="bar", title=title)
+    ax.bar_label(ax.containers[0], fontsize=7)  # Add count labels on top of bars
+
     plt.xlabel("Technique")
     plt.ylabel("Count")
     plt.xticks(rotation=45, fontsize=7)
     plt.yticks(fontsize=7)
 
+    plt.tight_layout()  # Adjust layout to prevent clipping of labels
     plt.show()
 
 def technique_county_overtimex(df: pd.DataFrame, title: str):
