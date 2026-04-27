@@ -51,6 +51,7 @@ def technique_county_overtimex(df: pd.DataFrame, title: str):
         prop={"size": 6}    # Keep the legend smaller
     )
 
+    plt.tight_layout()
     plt.show()
 
 def percent_technique(df: pd.DataFrame, title: str):
