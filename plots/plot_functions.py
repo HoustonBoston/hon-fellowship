@@ -52,3 +52,46 @@ def technique_county_overtimex(df: pd.DataFrame, title: str):
     )
 
     plt.show()
+
+def percent_technique(df: pd.DataFrame, title: str):
+
+    import numpy as np
+
+    """Pie chart of percentage of each technique for all years"""
+
+    # Count occurences of each technique
+    technique_counts = df['technique'].value_counts()
+
+    _, ax = plt.subplots(figsize=(9, 5))  # Larger canvas so the pie can be bigger
+
+    # wedges contains data for pie slice
+    wedges, texts, autotexts = ax.pie(
+        technique_counts,
+        autopct='%.1f%%',  # Show percentage on the pie chart,
+        radius=1.15,
+    )
+
+    # Style the percentage labels
+    for autotext in autotexts:
+        autotext.set_fontsize(8)  # Set font size for percentage labels
+
+    for i, p in enumerate(wedges):
+        ang = (p.theta2 - p.theta1)/2. + p.theta1
+        y = np.sin(np.deg2rad(ang))
+        x = np.cos(np.deg2rad(ang))
+
+        # Determine label position based on the angle
+        horizontalalignment = {-1: "right", 1: "left"}[int(np.sign(x))]
+        connectionstyle = f"angle,angleA=0,angleB={ang}"
+
+        label = f"{technique_counts.index[i]} ({technique_counts.iloc[i]})"
+
+        ax.annotate(label, xy=(x, y), xytext=(1.35*np.sign(x), 1.4*y),
+                    horizontalalignment=horizontalalignment,
+                    fontsize=7,
+                    arrowprops=dict(arrowstyle="-", connectionstyle=connectionstyle))
+        
+    ax.set_title(title, pad=36)
+
+    plt.tight_layout()  # Adjust layout to prevent clipping of labels
+    plt.show()
