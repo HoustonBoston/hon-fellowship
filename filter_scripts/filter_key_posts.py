@@ -58,4 +58,4 @@ with open(output_dir / f"filtered_{path.name}", "w", encoding="utf-8") as f:
                 "ups": post.get("ups"),
                 "downs": post.get("downs"),
             }
-            f.write(json.dumps(filtered_post) + "\n")
+            f.write(json.dumps(filtered_post, ensure_ascii=False) + "\n")

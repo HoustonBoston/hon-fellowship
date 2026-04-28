@@ -52,4 +52,4 @@ with open(output_dir / f"filtered_{path.name}", "w", encoding="utf-8") as f:
                 else None,
             } if comment.get("body", "").strip() != "" else None
             if filtered_comment is not None:
-                f.write(json.dumps(filtered_comment) + "\n")
+                f.write(json.dumps(filtered_comment, ensure_ascii=False) + "\n")
