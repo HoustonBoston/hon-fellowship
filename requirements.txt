@@ -10,3 +10,9 @@ requests
 ollama
 nltk
 jupyter
+bertopic
+sentence-transformers
+umap-learn
+hdbscan
+scikit-learn
+plotly
