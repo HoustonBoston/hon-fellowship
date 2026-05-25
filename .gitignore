@@ -6,3 +6,4 @@ scrapers/data/*
 */.env
 **/*.json*
 **/*pycache*
+.venv
