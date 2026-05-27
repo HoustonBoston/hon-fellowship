@@ -7,3 +7,4 @@ scrapers/data/*
 **/*.json*
 **/*pycache*
 .venv
+outputs/
